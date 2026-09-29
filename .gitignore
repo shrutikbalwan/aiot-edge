@@ -1,0 +1,32 @@
+# AIoT-Edge Project - Gitignore
+
+# Generated ML model files (regenerate with: python3 ml\run_training.py)
+ml/models/*.tflite
+ml/models/metadata.json
+ml/models/labels.txt
+ml/models/nn_weights.h
+
+# Build outputs (build with: idf.py build)
+*.elf
+*.bin
+*.hex
+
+# Environment-specific
+.idea/
+.vscode/
+
+# Sensitive data (never commit!)
+*.pem
+*.key
+*.crt
+*.p12
+
+# IDE files
+*.swp
+*.sln
+*.sln.*.filters
+*.sln.*.vcxuser
+
+# OS generated
+Thumbs.db
+Desktop.ini
