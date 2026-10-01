@@ -28,7 +28,7 @@
 #define NUM_SENSOR_SAMPLES      (128U)
 
 /* ------------------------------------------------------------ */
-/*                                  Types                         */
+  /*                                  Types                         */
 /* ------------------------------------------------------------ */
 typedef struct {
     uint16_t audio_frame[FRAME_SIZE];
@@ -39,14 +39,22 @@ typedef struct {
 } edge_data_t;
 
 /* ------------------------------------------------------------ */
- /*                          FreeRTOS Primitives                 */
+  /*                          FreeRTOS Primitives                 */
 /* ------------------------------------------------------------ */
 #define SENSOR_DATA_QUEUE_LENGTH  4
 static QueueHandle_t g_sensor_data_queue;
 static SemaphoreHandle_t g_sensor_semaphore;
+static TimerHandle_t g_sensor_timeout_timer;
+
+/* Mutex for shared BLE data transmission */
+static MutexHandle_t g_ble_data_mutex;
 
 /* Wake word task notification index */
 #define TASK_NOTIFY_WAKE_WORD     0x01
+
+/* Wake word shared flags */
+uint8_t g_wake_word_detected = 0;
+uint32_t last_wake_word_detected = 0;
 
 /* ------------------------------------------------------------ */
 /*                                  Function Prototypes         */
@@ -76,6 +84,8 @@ void main(void) {
     /* Initialize FreeRTOS primitives */
     g_sensor_data_queue = xQueueCreate(SENSOR_DATA_QUEUE_LENGTH, sizeof(edge_data_t));
     g_sensor_semaphore = xSemaphoreCreateBinary();
+    g_ble_data_mutex = xMutexCreateRecursive();
+    g_sensor_timeout_timer = xTimerCreate("sensor_timeout", pdMS_TO_TICKS(5000), pdFALSE, 0, vSensorTimeoutCallback);
 
     /* Start scheduler */
     vTaskStartScheduler();
@@ -154,7 +164,7 @@ static void vHealthMonitorTask(void *pvParameters) {
 }
 
 /* ------------------------------------------------------------ */
-/*          BLE Connectivity Task                               */
+  /*          BLE Connectivity Task                               */
 /* ------------------------------------------------------------ */
 static void vBleConnectivityTask(void *pvParameters) {
     edge_data_t recv_data;
@@ -164,10 +174,14 @@ static void vBleConnectivityTask(void *pvParameters) {
         if (g_sensor_data_queue && xQueueReceive(g_sensor_data_queue, &recv_data, pdMS_TO_TICKS(10))) {
             /* Send sensor data and command status to phone app */
             if (recv_data.vital_signs_valid) {
-                ble_transport_send_data(
-                    &recv_data,
-                    sizeof(edge_data_t)
-                );
+                /* Acquire mutex for thread-safe BLE transmission */
+                if (xMutexRecursiveTake(g_ble_data_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    ble_transport_send_data(
+                        &recv_data,
+                        sizeof(edge_data_t)
+                    );
+                    xMutexRecursiveGive(g_ble_data_mutex);
+                }
             }
         }
 
@@ -189,6 +203,8 @@ static void vNNInferenceTask(void *pvParameters) {
     int8_t  acc_output[10]; /* 10 command classes */
     uint32_t start_tick, end_tick;
     uint32_t ulNotifiedValue;
+    TickType_t last_wake_word_time = 0;
+    const TickType_t wake_word_debounce_ms = 200; /* Debounce wake word detection */
 
     /* Load quantized neural network model */
     nn_handle = nn_accelerator_load_model("wake_word.tflite");
@@ -201,12 +217,14 @@ static void vNNInferenceTask(void *pvParameters) {
 
         /* Check for wake word / command */
         if (acc_output[0] > 0.7f) { /* Threshold for wake word */
-            /* Give task notification to BLE task */
-            if (xTaskGetCurrentTaskHandle() != xTaskGetHandle("NNInfer")) {
+            /* Debounce wake word detection (minimum 200ms between detections) */
+            if (xTaskGetTickCount() - last_wake_word_time > pdMS_TO_TICKS(wake_word_debounce_ms)) {
+                /* Give task notification to BLE task */
                 ulNotifiedValue = xTaskNotifyGive(xTaskGetHandle("BLEConn"));
+                /* Wake word flag for telemetry publish */
+                g_wake_word_detected = 1;
+                last_wake_word_time = xTaskGetTickCount();
             }
-            /* Wake word flag for telemetry publish */
-            g_wake_word_detected = 1;
         }
 
         /* Print inference time for profiling */
@@ -219,7 +237,7 @@ static void vNNInferenceTask(void *pvParameters) {
 }
 
 /* ------------------------------------------------------------ */
-/*                          System Initialization               */
+  /*                          System Initialization               */
 /* ------------------------------------------------------------ */
 void system_init(void) {
     /* Configure system clock */
@@ -235,4 +253,18 @@ void system_init(void) {
 
     /* Initialize power management */
     pmgr_init();
+
+    /* Start sensor timeout timer */
+    if (g_sensor_timeout_timer) {
+        xTimerStart(g_sensor_timeout_timer, 0);
+    }
+}
+
+/* ------------------------------------------------------------ */
+  /*                    Sensor Timeout Timer Callback             */
+/* ------------------------------------------------------------ */
+void vSensorTimeoutCallback(TimerHandle_t xTimer) {
+    /* Reset sensor data flag on timeout */
+    g_sensor_data_queue = NULL;
+    ESP_LOGW("SYS", "Sensor data timeout - resetting queue");
 }

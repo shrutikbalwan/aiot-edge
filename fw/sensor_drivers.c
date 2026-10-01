@@ -209,8 +209,26 @@ void sensor_read_accel(int16_t *x, int16_t *y, int16_t *z) {
 }
 
 esp_err_t sensor_detect_activity(void) {
-    /* Simple threshold-based activity detection */
-    /* In a full implementation, would use BMI160 embedded sensor hub */
+    /* Activity detection using accelerometer threshold monitoring */
+    /* Detects significant acceleration changes indicating activity/fall */
+    int16_t x, y, z;
+    sensor_read_accel(&x, &y, &z);
+
+    /* Calculate resultant acceleration magnitude */
+    int32_t magnitude = (int32_t)x * x + (int32_t)y * y + (int32_t)z * z;
+    int32_t magnitude_norm = (int32_t)sqrt((double)magnitude);
+
+    /* Threshold: significant change > 8000 (approx 1g = 256 LSB, calibrated) */
+    static int32_t last_magnitude = 0;
+    int32_t delta = magnitude_norm - last_magnitude;
+
+    if (abs(delta) > 8000) {
+        ESP_LOGI("SENSOR", "Activity detected! delta=%d, magnitude=%d", delta, magnitude_norm);
+        last_magnitude = magnitude_norm;
+        return ESP_OK;
+    }
+
+    last_magnitude = magnitude_norm;
     return ESP_OK;
 }
 
