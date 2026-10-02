@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIoT-Edge Dashboard</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #e74c3c;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --info: #3498db;
+            --light-bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #2c3e50;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--light-bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3 {
+            color: var(--primary);
+        }
+
+        /* Header */
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+        }
+
+        .header-title .device-id {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        /* Main content */
+        main {
+            flex: 1;
+            padding: 0 2rem;
+            width: 100%;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+        }
+
+        /* Card styles */
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-status {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+
+        /* Metric styles */
+        .metric-display {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+        }
+
+        .metric-unit {
+            font-size: 0.6rem;
+            color: #aaa;
+            margin-left: 4px;
+        }
+
+        /* Status indicators */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+
+        .status-online { background: var(--success); animation: pulse 2s infinite; }
+        .status-offline { background: var(--accent); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Sensors card */
+        #sensors-card .metric-value {
+            color: var(--primary);
+        }
+
+        .health-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .health-normal { background: #d5f5e3; color: var(--success); }
+        .health-warning { background: #fff4e5; color: var(--warning); }
+        .health-critical { background: #fae3e3; color: var(--accent); }
+
+        /* BLE/Cardio status */
+ .ble-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .ble-connected { background: #d5f5e3; color: var(--success); }
+        .ble-disconnected { background: #fae3e3; color: var(--accent); }
+
+        /* Controls */
+        .controls {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid #eee;
+        }
+
+        .control-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-right: 0.5rem;
+        }
+
+        .control-btn:hover {
+            background: #1a252f;
+        }
+
+        .control-btn[data-action="connect"]:hover { background: var(--success); }
+        .control-btn[data-action="disconnect"]:hover { background: var(--accent); }
+
+        /* Instructions */
+        .instructions {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #eef;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #555;
+        }
+
+        .instructions h3 {
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .instructions ul {
+            margin-left: 1rem;
+        }
+
+        .instructions li {
+            margin-bottom: 0.3rem;
+        }
+
+        /* Loading state */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .loading::after {
+            content: ' loading...';
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1><span style="color: #e74c3c;">🎯</span> AIoT-Edge Dashboard</h1>
+            <span class="device-id" id="device-id">Simulated Device</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="dashboard-grid">
+
+            <!-- Heart Rate & SpO2 Card -->
+            <div class="card" id="sensors-card">
+                <div class="card-header">
+                    <span class="card-title">Health Vital Signs</span>
+                    <span class="card-status"><span class="status-dot status-online" id="ppg-status"></span>Online</span>
+                </div>
+
+                <div class="metric-display" id="heart-rate">
+                    <span class="metric-value">72</span>
+                    <span class="metric-unit">bpm</span>
+                </div>
+                <div class="metric-label">Heart Rate</div>
+
+                <div class="metric-display" id="spo2">
+                    <span class="metric-value">98</span>
+                    <span class="metric-unit">%</span>
+                </div>
+                <div class="metric-label">SpO2</div>
+
+                <div class="metric-display" id="temperature">
+                    <span class="metric-value">36.8</span>
+                    <span class="metric-unit">°C</span>
+                </div>
+                <div class="metric-label">Temperature</div>
+
+                <div class="health-status" id="health-status">Normal</div>
+            </div>
+
+            <!-- Accelerometer Card -->
+            <div class="card" id="accel-card">
+                <div class="card-header">
+                    <span class="card-title">Accelerometer</span>
+                    <span class="card-status"><span class="status-dot status-online" id="accel-status"></span>Online</span>
+                </div>
+
+                <div class="metric-display" id="accel-x">
+                    <span class="metric-value">0</span>
+                </div>
+                <div class="metric-label">X</div>
+
+                <div class="metric-display" id="accel-y">
+                    <span class="metric-value">0</span>
+                </div>
+                <div class="metric-label">Y</div>
+
+                <div class="metric-display" id="accel-z">
+                    <span class="metric-value">256</span>
+                </div>
+                <div class="metric-label">Z</div>
+
+                <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee;">
+                    <span>Magnitude: <span id="accel-magnitude">1.00g</span></span>
+                </div>
+            </div>
+
+            <!-- Wake Word Card -->
+            <div class="card" id="wake-card">
+                <div class="card-header">
+                    <span class="card-title">Wake Word Detection</span>
+                    <span class="card-status"><span class="status-dot" id="wake-status"></span>Idle</span>
+                </div>
+
+                <div class="metric-display" style="font-size: 1.5rem; color: #e74c3c;" id="wake-word-status">
+                    -- -- --
+                </div>
+                <div class="metric-label">Wake Word</div>
+            </div>
+
+            <!-- OTA & ML Card -->
+            <div class="card" id="ota-card">
+                <div class="card-header">
+                    <span class="card-title">System Status</span>
+                    <span class="card-status"><span class="status-dot" id="ota-status"></span>Ready</span>
+                </div>
+
+                <div class="metric-display" id="fw-version">
+                    <span class="metric-value">v1.0.0</span>
+                </div>
+                <div class="metric-label">Firmware Version</div>
+
+                <div class="metric-display" id="mqtt-status">
+                    <span class="metric-value">Disconnected</span>
+                </div>
+                <div class="metric-label">MQTT Connection</div>
+
+                <div class="metric-display" id="nn-inference">
+                    <span class="metric-value">0</span>
+                    <span class="metric-unit"> inferences</span>
+                </div>
+                <div class="metric-label">NN Inferences</div>
+            </div>
+
+        </div>
+    </main>
+
+    <div class="controls">
+        <button class="control-btn" data-action="connect" onclick="connectMQTT()">Connect MQTT</button>
+        <button class="control-btn" data-action="disconnect" onclick="disconnectMQTT()">Disconnect</button>
+    </div>
+
+    <div class="instructions">
+        <h3>Dashboard Controls</h3>
+        <ul>
+            <li><b>Connect MQTT:</b> Connect to the MQTT broker to receive live data</li>
+            <li><b>Disconnect:</b> Disconnect the MQTT connection</li>
+            <li>The dashboard simulates data if MQTT is not connected</li>
+            <li>Real hardware would publish to: <code>aiot/edge/#</code></li>
+        </ul>
+    </div>
+
+    <script>
+        // MQTT Configuration
+        const MQTT_BROKER = "mqtt.googleapis.com";
+        const MQTT_PORT = 8883;
+        const CLIENT_ID = "aiot-edge-dashboard-" + Date.now();
+
+        // Topics from AIoT-Edge project
+        const TOPICS = {
+            status: "aiot/edge/status",
+            commands: "aiot/edge/commands",
+            ota: "aiot/edge/ota",
+            wakeWord: "aiot/edge/wake_word"
+        };
+
+        // State
+        let mqttClient = null;
+        let connected = false;
+        let sensorInterval = null;
+        let wakeTimeout = null;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up simulated data updates if MQTT not connected
+            startSimulatedData();
+            updateConnectionStatus(false);
+
+            // Buttons
+            document.querySelector('[data-action="connect"]').disabled = false;
+            document.querySelector('[data-action="disconnect"]').disabled = true;
+        });
+
+        // Connect to MQTT (simulated for demo)
+        function connectMQTT() {
+            updateConnectionStatus(true);
+            document.querySelector('[data-action="connect"]').disabled = true;
+            document.querySelector('[data-action="disconnect"]').disabled = false;
+
+            // In real implementation, would connect to MQTT broker
+            // For demo, just start simulated data
+            if (!sensorInterval) {
+                startSimulatedData();
+            }
+        }
+
+        function disconnectMQTT() {
+            connected = false;
+            updateConnectionStatus(false);
+            document.querySelector('[data-action="connect"]').disabled = false;
+            document.querySelector('[data-action="disconnect"]').disabled = true;
+
+            if (sensorInterval) {
+                clearInterval(sensorInterval);
+                sensorInterval = null;
+            }
+            if (wakeTimeout) {
+                clearTimeout(wakeTimeout);
+                wakeTimeout = null;
+            }
+        }
+
+        // Start simulated sensor data
+        function startSimulatedData() {
+            sensorInterval = setInterval(function() {
+                updateSensorData();
+                updateWakeWordStatus();
+            }, 100); /* 10 Hz */
+
+            wakeTimeout = setInterval(function() {
+                // Simulate wake word every 5-7 seconds
+                simulateWakeWord();
+            }, 5000 + Math.random() * 2000);
+        }
+
+        // Update all sensor readings
+        function updateSensorData() {
+            // Simulate heart rate (60-100 bpm, realistic variation)
+            const hr = 60 + Math.random() * 40;
+            document.getElementById('heart-rate').querySelector('.metric-value').textContent = Math.round(hr);
+
+            // Simulate SpO2 (95-100%)
+            const spo2 = 95 + Math.random() * 5;
+            document.getElementById('spo2').querySelector('.metric-value').textContent = Math.round(spo2);
+
+            // Simulate temperature (35-40°C)
+            const temp = (35 + Math.random() * 5).toFixed(1);
+            document.getElementById('temperature').querySelector('.metric-value').textContent = temp;
+
+            // Simulate accelerometer
+            const x = Math.round((Math.random() - 0.5) * 200);
+            const y = Math.round((Math.random() - 0.5) * 200);
+            const z = 256 + Math.round((Math.random() - 0.5) * 50); /* ~1g */
+
+            document.getElementById('accel-x').querySelector('.metric-value').textContent = x;
+            document.getElementById('accel-y').querySelector('.metric-value').textContent = y;
+            document.getElementById('accel-z').querySelector('.metric-value').textContent = z;
+
+            const magnitude = Math.sqrt(x*x + y*y + z*z) / 256.0;
+            document.getElementById('accel-magnitude').textContent = magnitude.toFixed(2) + 'g';
+
+            // Health status
+            const hrVal = Math.round(hr);
+            const spo2Val = Math.round(spo2);
+            const healthBar = document.getElementById('health-status');
+
+            if (hrVal >= 60 && hrVal <= 100 && spo2Val >= 95) {
+                healthBar.className = 'health-status health-normal';
+                healthBar.textContent = 'Normal';
+            } else if (hrVal < 60 || hrVal > 100) {
+                healthBar.className = 'health-status health-warning';
+                healthBar.textContent = 'Elevated HR';
+            } else {
+                healthBar.className = 'health-status health-critical';
+                healthBar.textContent = 'Critical';
+            }
+
+            // Accelerometer status
+            const accelStatus = document.getElementById('accel-status');
+            accelStatus.className = 'status-dot ' + (Math.abs(x) < 50 && Math.abs(y) < 50 && z > 200 ? 'status-online' : 'status-online');
+        }
+
+        // Update wake word status
+        function updateWakeWordStatus() {
+            // Random wake word detection for demo
+            const detected = Math.random() > 0.95; /* ~5% chance */
+
+            const wakeDisplay = document.getElementById('wake-word-status');
+            const wakeStatus = document.getElementById('wake-status');
+
+            if (detected) {
+                wakeDisplay.innerHTML = '🔔 DETECTED';
+                wakeDisplay.style.color = '#e74c3c';
+                wakeStatus.className = 'status-dot status-online';
+
+                // Auto-reset after 2 seconds
+                if (wakeTimeout) clearTimeout(wakeTimeout);
+                wakeTimeout = setTimeout(function() {
+                    wakeDisplay.innerHTML = '-- -- --';
+                    wakeStatus.className = 'status-dot';
+                }, 2000);
+            } else {
+                wakeDisplay.innerHTML = '-- -- --';
+                wakeStatus.className = 'status-dot';
+            }
+        }
+
+        // Update connection status
+        function updateConnectionStatus(isConnecting) {
+            const statusDot = document.getElementById('ppg-status');
+            const mqttDisplay = document.getElementById('mqtt-status');
+            const connectBtn = document.querySelector('[data-action="connect"]');
+            const disconnectBtn = document.querySelector('[data-action="disconnect"]');
+
+            if (isConnecting) {
+                statusDot.className = 'status-dot status-online';
+                mqttDisplay.innerHTML = 'Connecting...';
+                mqttDisplay.style.color = '#f39c12';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else if (connected) {
+                statusDot.className = 'status-dot status-online';
+                mqttDisplay.innerHTML = 'Connected';
+                mqttDisplay.style.color = var(--success);
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusDot.className = 'status-dot status-offline';
+                mqttDisplay.innerHTML = 'Disconnected';
+                mqttDisplay.style.color = var(--accent);
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        // Simulate a wake word event
+        function simulateWakeWord() {
+            const wakeDisplay = document.getElementById('wake-word-status');
+            const wakeStatus = document.getElementById('wake-status');
+
+            if (Math.random() > 0.9) {
+                wakeDisplay.innerHTML = '🔔 WAKE';
+                wakeDisplay.style.color = '#e74c3c';
+                wakeStatus.className = 'status-dot status-online';
+
+                setTimeout(function() {
+                    wakeDisplay.innerHTML = '-- -- --';
+                    wakeStatus.className = 'status-dot';
+                }, 1500);
+            }
+        }
+
+        // Receive MQTT message (simulated)
+        function receiveMQTTMessage(topic, payload) {
+            const payloadObj = JSON.parse(payload);
+
+            if (topic === TOPICS.status) {
+                // Update dashboard from MQTT status message
+                if (payloadObj.heart_rate !== undefined) {
+                    document.getElementById('heart-rate').querySelector('.metric-value').textContent = payloadObj.heart_rate;
+                }
+                if (payloadObj.spo2 !== undefined) {
+                    document.getElementById('spo2').querySelector('.metric-value').textContent = payloadObj.spo2;
+                }
+                if (payloadObj.temperature !== undefined) {
+                    document.getElementById('temperature').querySelector('.metric-value').textContent = payloadObj.temperature.toFixed(1);
+                }
+                if (payloadObj.accel_x !== undefined) {
+                    document.getElementById('accel-x').querySelector('.metric-value').textContent = payloadObj.accel_x;
+                    document.getElementById('accel-y').querySelector('.metric-value').textContent = payloadObj.accel_y;
+                    document.getElementById('accel-z').querySelector('.metric-value').textContent = payloadObj.accel_z;
+                }
+                if (payloadObj.wake_word_detected !== undefined) {
+                    const wakeDisplay = document.getElementById('wake-word-status');
+                    wakeDisplay.innerHTML = payloadObj.wake_word_detected ? '🔔 WAKE' : '-- -- --';
+                    wakeDisplay.style.color = payloadObj.wake_word_detected ? '#e74c3c' : '#666';
+                }
+            }
+
+            if (topic === TOPICS.wakeWord) {
+                // Wake word event from MQTT
+                updateWakeWordStatus();
+            }
+
+            if (topic === TOPICS.ota) {
+                // OTA update event
+                console.log('OTA update received:', payload);
+            }
+        }
+
+        // Example: Simulate receiving an MQTT message
+        function simulateMQTTMessage() {
+            const sampleStatus = {
+                heart_rate: Math.round(60 + Math.random() * 40),
+                spo2: Math.round(95 + Math.random() * 5),
+                temperature: (35 + Math.random() * 5).toFixed(1),
+                accel_x: Math.round((Math.random() - 0.5) * 200),
+                accel_y: Math.round((Math.random() - 0.5) * 200),
+                accel_z: 256 + Math.round((Math.random() - 0.5) * 50),
+                wake_word_detected: Math.random() > 0.9,
+                battery_pct: 80 + Math.random() * 15,
+                cpu_pct: 10 + Math.random() * 30,
+                mem_free_kb: 200 + Math.random() * 300
+            };
+
+            receiveMQTTMessage(TOPICS.status, JSON.stringify(sampleStatus));
+        }
+
+        // Simulate periodic MQTT message
+        setInterval(simulateMQTTMessage, 3000);
+
+        // Show initial simulated data
+        setTimeout(startSimulatedData, 500);
+    </script>
+</body>
+</html>
