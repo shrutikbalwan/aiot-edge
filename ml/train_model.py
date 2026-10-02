@@ -12,8 +12,9 @@ import pickle
 import json
 import os
 
-# Mixed precision for faster training
-policy = mixed_precision.Policy('float16')
+# Mixed precision: use float32 for training stability,
+# int8 quantization will be applied post-training for edge deployment
+policy = mixed_precision.Policy('float32')
 tf.keras.mixed_precision.set_global_policy(policy)
 
 def generate_realistic_synthetic_data(num_samples=5000, frame_size=256):
