@@ -71,8 +71,8 @@ def build_ultra_lightweight_model(input_shape=256, output_size=2):
     x = layers.MaxPooling1D(pool_size=2, strides=2)(x)
     
     # Block 2: Depthwise separable for efficiency
-    x = layers.DepthwiseConv1D(filters=8, kernel_size=3, padding='same',
-                              activation='relu', depth_multiplier=1)(x)
+    x = layers.DepthwiseConv1D(depth_multiplier=1, kernel_size=3, padding='same',
+                              activation='relu')(x)
     x = layers.Conv1D(filters=8, kernel_size=1, padding='same', activation='relu')(x)
     x = layers.BatchNormalization()(x)
     x = layers.MaxPooling1D(pool_size=2, strides=2)(x)
