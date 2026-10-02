@@ -122,96 +122,284 @@ esp_err_t i2c_master_read(uint8_t addr, uint8_t *reg_addr, uint8_t reg_len, uint
 }
 
 /* ------------------------------------------------------------ */
-/*                          Task Functions                      */
+/*                          BLE Communication Simulation        */
 /* ------------------------------------------------------------ */
+#define BLE_DEVICE_NAME "AIoT-Edge-HM"
+#define BLE_ADVERTISING_INTERVAL  160  /* 100ms units ~ 160ms */
+#define BLE_CONNECTION_INTERVAL   32   /* 20ms units ~ 20ms */
+#define BLE_SUPERVISION_TIMEOUT 1000   /* 10s units ~ 10s */
+#define MAX_NOTIFICATION_PAYLOAD 20
 
-/* PPG Processing Task */
-static void vSimulationPPGTask(void *pvParameters) {
-    uint16_t samples[128];
-    uint32_t sample_count = 0;
-    
-    printf("[TASK] PPG Simulation Task started\n");
-    
+/* BLE connection state */
+static uint8_t g_sim_ble_connected = 0;
+static uint16_t g_sim_conn_handle = 0;
+static uint8_t g_sim_ble_notify_index = 0;
+static uint8_t g_sim_tx_power = 0;
+
+/* Callback functions */
+static ble_notify_cbfn_t g_sim_ble_data_cbfn = NULL;
+static ble_connect_cbfn_t g_sim_ble_connect_cbfn = NULL;
+static ble_disconnect_cbfn_t g_sim_ble_disconnect_cbfn = NULL;
+
+/* Simulated BLE data to transmit */
+static uint8_t g_sim_ble_data[20];
+static uint16_t g_sim_ble_data_len = 0;
+
+/* ------------------------------------------------------------ */
+/*                          BLE Task                            */
+/* ------------------------------------------------------------ */
+static void vSimBleTask(void *pvParameters) {
     for (;;) {
-        /* Read simulated PPG sensor */
-        uint16_t ppg_value = sensor_read_ppg();
-        samples[sample_count % 128] = ppg_value;
-        sample_count++;
-        
-        /* Estimate heart rate every 10 samples */
-        if (sample_count % 10 == 0) {
-            sensor_estimate_heart_rate(samples, 10);
+        /* Simulate BLE stack - process events */
+        /* Check for connection events */
+        if (g_sim_ble_connected) {
+            /* Simulate periodic connection maintenance */
+            /* In real: BLE stack handles this */
         }
         
-        /* Detect irregular rhythm every 50 samples */
-        if (sample_count % 50 == 0) {
-            bool irregular = sensor_detect_irrhythm(samples, 50);
-            if (irregular) {
-                printf("[ALERT] Irregular rhythm detected!\n");
-                ble_transport_send_alert(ALERT_ARRHYTHMIA);
-            }
+        /* Simulate advertising if not connected */
+        if (!g_sim_ble_connected) {
+            /* Simulate advertising every 100ms */
+            static uint32_t last_adv = 0;
+            /* Would use xTaskGetTickCount() in real FreeRTOS */
         }
         
-        vTaskDelay(pdMS_TO_TICKS(10)); /* 100 Hz update rate */
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
-/* Temperature Task */
-static void vSimulationTempTask(void *pvParameters) {
-    printf("[TASK] Temperature Simulation Task started\n");
+/* ------------------------------------------------------------ */
+/*                          BLE Initialization                   */
+/* ------------------------------------------------------------ */
+void ble_simulation_init(void) {
+    printf("[SIM BLE] BLE Simulation initialized\n");
+    g_sim_ble_connected = 0;
+    g_sim_conn_handle = 0;
+    g_sim_ble_notify_index = 0;
     
-    for (;;) {
-        /* Read simulated temperature */
-        int16_t temp_raw = sensor_read_temp();
-        float temp_c = temp_raw / 256.0f; /* Convert to °C */
-        
-        printf("[SENSOR] Temperature: %.2f°C (raw: %d)\n", temp_c, temp_raw);
-        
-        vTaskDelay(pdMS_TO_TICKS(100)); /* 10 Hz update rate */
+    /* Register simulated callbacks */
+    g_sim_ble_data_cbfn = NULL;
+    g_sim_ble_connect_cbfn = NULL;
+    g_sim_ble_disconnect_cbfn = NULL;
+}
+
+/* ------------------------------------------------------------ */
+/*                          BLE API Functions                    */
+/* ------------------------------------------------------------ */
+esp_err_t ble_simulation_advertise(void) {
+    printf("[SIM BLE] Advertising as %s\n", BLE_DEVICE_NAME);
+    return ESP_OK;
+}
+
+esp_err_t ble_simulation_connect(uint16_t conn_handle) {
+    g_sim_ble_connected = 1;
+    g_sim_conn_handle = conn_handle;
+    printf("[SIM BLE] Connected! Handle: %d\n", conn_handle);
+    
+    /* Simulate connection callback */
+    if (g_sim_ble_connect_cbfn) {
+        g_sim_ble_connect_cbfn(ESP_OK, conn_handle);
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t ble_simulation_disconnect(uint16_t conn_handle, uint8_t reason) {
+    g_sim_ble_connected = 0;
+    g_sim_conn_handle = 0;
+    printf("[SIM BLE] Disconnected! Reason: %d\n", reason);
+    
+    /* Simulate connection callback */
+    if (g_sim_ble_disconnect_cbfn) {
+        g_sim_ble_disconnect_cbfn(reason);
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t ble_simulation_send_data(uint8_t *data, uint16_t len) {
+    if (!g_sim_ble_connected) {
+        printf("[SIM BLE] Not connected, cannot send data\n");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    /* Simulate data transmission */
+    g_sim_ble_data_len = len > 20 ? 20 : len;
+    memcpy(g_sim_ble_data, data, g_sim_ble_data_len);
+    printf("[SIM BLE] Sent %d bytes: ", g_sim_ble_data_len);
+    for (int i = 0; i < g_sim_ble_data_len; i++) {
+        printf("0x%02x ", g_sim_ble_data[i]);
+    }
+    printf("\n");
+    
+    /* Simulate callback */
+    if (g_sim_ble_data_cbfn) {
+        g_sim_ble_data_cbfn(g_sim_ble_data, g_sim_ble_data_len);
+    }
+    
+    return ESP_OK;
+}
+
+/* ------------------------------------------------------------ */
+/*                          MQTT Simulation                      */
+/* ------------------------------------------------------------ */
+#define MQTT_BROKER "mqtt.googleapis.com"
+#define MQTT_PORT 8883
+#define MQTT_CLIENT_ID "aiot-edge-sim-"
+
+static uint8_t g_sim_mqtt_connected = 0;
+static char g_sim_client_id[64];
+
+/* MQTT topic callbacks */
+typedef void (*mqtt_topic_cb_t)(const char *topic, const char *payload);
+
+static mqtt_topic_cb_t g_sim_mqtt_status_cb = NULL;
+static mqtt_topic_cb_t g_sim_mqtt_wake_word_cb = NULL;
+static mqtt_topic_cb_t g_sim_mqtt_ota_cb = NULL;
+
+/* ------------------------------------------------------------ */
+/*                          MQTT Simulation                      */
+/* ------------------------------------------------------------ */
+void mqtt_simulation_init(const char *client_id) {
+    strncpy(g_sim_client_id, client_id, sizeof(g_sim_client_id) - 1);
+    g_sim_mqtt_connected = 0;
+    printf("[SIM MQTT] MQTT Simulation initialized: %s\n", g_sim_client_id);
+}
+
+esp_err_t mqtt_simulation_connect(void) {
+    g_sim_mqtt_connected = 1;
+    printf("[SIM MQTT] Connected to %s:%d\n", MQTT_BROKER, MQTT_PORT);
+    return ESP_OK;
+}
+
+esp_err_t mqtt_simulation_disconnect(void) {
+    g_sim_mqtt_connected = 0;
+    printf("[SIM MQTT] Disconnected\n");
+    return ESP_OK;
+}
+
+esp_err_t mqtt_simulation_publish(const char *topic, const char *payload) {
+    if (!g_sim_mqtt_connected) {
+        printf("[SIM MQTT] Not connected, cannot publish\n");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    printf("[SIM MQTT] Published to %s: %s\n", topic, payload);
+    
+    /* Simulate receiving a response */
+    /* Could trigger topic callbacks */
+    return ESP_OK;
+}
+
+esp_err_t mqtt_simulation_subscribe(const char *topic, mqtt_topic_cb_t cb) {
+    if (strcmp(topic, "aiot/edge/status") == 0) {
+        g_sim_mqtt_status_cb = cb;
+    } else if (strcmp(topic, "aiot/edge/wake_word") == 0) {
+        g_sim_mqtt_wake_word_cb = cb;
+    } else if (strcmp(topic, "aiot/edge/ota") == 0) {
+        g_sim_mqtt_ota_cb = cb;
+    }
+    printf("[SIM MQTT] Subscribed to %s\n", topic);
+    return ESP_OK;
+}
+
+/* ------------------------------------------------------------ */
+/*                          Power Modeling                      */
+/* ------------------------------------------------------------ */
+typedef enum {
+    POWER_STATE_ACTIVE,
+    POWER_STATE_SLEEP,
+    POWER_STATE_DEEP_SLEEP,
+    POWER_STATE_HIBERNATE
+} power_sim_state_t;
+
+static power_sim_state_t g_sim_power_state = POWER_STATE_ACTIVE;
+static uint32_t g_sim_active_time_ms = 0;
+static uint32_t g_sim_sleep_time_ms = 0;
+static uint32_t g_sim_total_uah = 0; /* microamps-hours */
+
+void power_simulation_init(void) {
+    g_sim_power_state = POWER_STATE_ACTIVE;
+    g_sim_active_time_ms = 0;
+    g_sim_sleep_time_ms = 0;
+    g_sim_total_uah = 0;
+    printf("[SIM POWER] Power simulation initialized\n");
+}
+
+void power_simulation_set_state(power_sim_state_t state) {
+    g_sim_power_state = state;
+    printf("[SIM POWER] State changed to: %s\n", 
+           state == POWER_STATE_ACTIVE ? "ACTIVE" :
+           state == POWER_STATE_SLEEP ? "SLEEP" :
+           state == POWER_STATE_DEEP_SLEEP ? "DEEP_SLEEP" : "HIBERNATE");
+}
+
+void power_simulation_tick_ms(uint32_t ms) {
+    /* Update power consumption tracking */
+    if (g_sim_power_state == POWER_STATE_ACTIVE) {
+        g_sim_active_time_ms += ms;
+        /* Approximate: ~5mW active, ~10uA at 3.3V */
+        g_sim_total_uah += (ms * 5 / (3.3 * 3600000)) * 1000000; /* rough */
+    } else if (g_sim_power_state == POWER_STATE_SLEEP) {
+        g_sim_sleep_time_ms += ms;
     }
 }
 
-/* Accelerometer Task */
-static void vSimulationAccelTask(void *pvParameters) {
-    printf("[TASK] Accelerometer Simulation Task started\n");
-    
-    for (;;) {
-        /* Read simulated accelerometer */
-        int16_t x, y, z;
-        sensor_read_accel(&x, &y, &z);
-        
-        /* Detect activity */
-        sensor_detect_activity();
-        
-        /* Print acceleration every second */
-        static uint32_t last_print = 0;
-        /* Note: would use xTaskGetTickCount() in real FreeRTOS */
-        printf("[SENSOR] Accel: x=%d, y=%d, z=%d (g-force: %.2f)\n", 
-               x, y, z, sqrt((int32_t)x*x + (int32_t)y*y + (int32_t)z*z) / 256.0f);
-        
-        vTaskDelay(pdMS_TO_TICKS(10)); /* 100 Hz update rate */
-    }
+void power_simulation_get_stats(uint32_t *active_ms, uint32_t *sleep_ms, uint32_t *uah) {
+    if (active_ms) *active_ms = g_sim_active_time_ms;
+    if (sleep_ms) *sleep_ms = g_sim_sleep_time_ms;
+    if (uah) *uah = g_sim_total_uah;
 }
 
-/* Wake Word / NN Inference Task */
-static void vSimulationNNTask(void *pvParameters) {
-    printf("[TASK] Neural Network Simulation Task started\n");
+/* ------------------------------------------------------------ */
+/*                          Fault Injection                      */
+/* ------------------------------------------------------------ */
+typedef enum {
+    FAULT_NONE,
+    FAULT_SENSOR_I2C_ERROR,
+    FAULT_SENSOR_VALUE_OUT_OF_RANGE,
+    FAULT_MQTT_CONNECTION_LOST,
+    FAULT_OTA_FAILURE,
+    FAULT_WIFI_DISCONNECT
+} fault_sim_type_t;
+
+static fault_sim_state_t g_sim_fault_state = FAULT_NONE;
+static uint32_t g_sim_fault_start_time = 0;
+static uint32_t g_sim_fault_duration_ms = 0;
+
+void fault_simulation_init(void) {
+    g_sim_fault_state = FAULT_NONE;
+    printf("[SIM FAULT] Fault simulation initialized\n");
+}
+
+void fault_simulation_inject_fault(fault_sim_type_t type, uint32_t duration_ms) {
+    g_sim_fault_state = type;
+    g_sim_fault_start_time = 0; /* 0 = immediate */
+    g_sim_fault_duration_ms = duration_ms;
+    printf("[SIM FAULT] Injecting fault: %s for %dms\n", 
+           type == FAULT_SENSOR_I2C_ERROR ? "I2C error" :
+           type == FAULT_SENSOR_VALUE_OUT_OF_RANGE ? "value out of range" :
+           type == FAULT_MQTT_CONNECTION_LOST ? "MQTT lost" :
+           type == FAULT_OTA_FAILURE ? "OTA failure" : "WiFi disconnect",
+           duration_ms);
+}
+
+bool fault_simulation_is_fault_active(void) {
+    if (g_sim_fault_state == FAULT_NONE) return false;
     
-    for (;;) {
-        /* Simulate wake word detection - periodic pattern */
-        uint32_t current_ticks = sim_last_wake_time + 200; /* 200ms debounce */
-        
-        /* Simple pattern: detect "wake word" every 5 seconds of simulation */
-        if (sim_last_wake_time == 0 || (current_ticks - sim_last_wake_time) > 5000) {
-            sim_wake_word_detected = 1;
-            sim_last_wake_time = current_ticks;
-            printf("[NN] Wake word detected!\n");
-            /* Give notification to BLE task */
-            /* In real: xTaskNotifyGive(xTaskGetHandle("BLEConn")); */
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(100)); /* 10 Hz inference rate */
-    }
+    /* Check if fault duration has elapsed */
+    if (g_sim_fault_duration_ms == 0) return true; /* Permanent fault */
+    
+    /* In real implementation: check elapsed time */
+    return true; /* For simulation: always active once injected */
+}
+
+fault_sim_type_t fault_simulation_get_active_fault(void) {
+    return g_sim_fault_state;
+}
+
+void fault_simulation_clear_fault(void) {
+    g_sim_fault_state = FAULT_NONE;
 }
 
 /* ------------------------------------------------------------ */
