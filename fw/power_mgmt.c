@@ -166,10 +166,20 @@ void power_mgmt_get_stats(uint32_t *sleep_cycles, uint32_t *active_cycles) {
 esp_err_t power_mgmt_enable_dfs(bool enable) {
     if (enable) {
         ESP_LOGI(PM_TAG, "Dynamic frequency scaling enabled");
-        /* DFS is handled by ESP-PM auto-tuning */
-        return ESP_OK;
+        /* Configure DFS via ESP-PM - set up auto-tuning */
+        esp_pm_config_dfs_t dfs_config = {
+            .enable = true,
+            .min_freq_mhz = DEFAULT_MIN_FREQ,
+            .max_freq_mhz = DEFAULT_MAX_FREQ,
+        };
+        esp_err_t ret = esp_pm_config_set(&dfs_config);
+        if (ret == ESP_OK) {
+            g_pm_handle.dfs_enabled = true;
+        }
+        return ret;
     }
     ESP_LOGI(PM_TAG, "Dynamic frequency scaling disabled");
+    g_pm_handle.dfs_enabled = false;
     return esp_pm_disable();
 }
 
@@ -181,6 +191,6 @@ power_mode_t power_mgmt_get_mode(void) {
     power_mode_t mode = {0};
     mode.light_sleep = g_pm_handle.light_sleep_enabled;
     mode.deep_sleep = g_pm_handle.deep_sleep_enabled;
-    mode.dfs_enabled = /* dfs status */ false;
+    mode.dfs_enabled = g_pm_handle.dfs_enabled;
     return mode;
 }

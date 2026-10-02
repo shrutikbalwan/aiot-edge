@@ -74,11 +74,19 @@ static void mqtt_event_handler(mqtt_client_handle_t client,
             break;
 
         case MQTT_EVENT_DATA:
-            /* Received message on subscribed topic */
-            memcpy(payload_buf, event->data, event->data_len);
-            payload_buf[event->data_len] = '\0';
-            
-            memcpy(topic_buf, event->topic_name, event->topic_len);
+/* Received message on subscribed topic */
+    memcpy(payload_buf, event->data, event->data_len);
+    payload_buf[event->data_len] = '\0';
+    
+    /* Buffer overflow protection: truncate if data exceeds buffer size */
+    if (event->data_len >= sizeof(payload_buf)) {
+        ESP_LOGW("MQTT", "Message too large (%d >= %d), truncating", 
+                 event->data_len, sizeof(payload_buf));
+        event->data_len = sizeof(payload_buf) - 1;
+        payload_buf[event->data_len] = '\0';
+    }
+    
+    memcpy(topic_buf, event->topic_name, event->topic_len);
             topic_buf[event->topic_len] = '\0';
             
             ESP_LOGI("MQTT", "Received [%.*s] %s", 

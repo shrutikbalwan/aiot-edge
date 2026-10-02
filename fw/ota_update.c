@@ -19,6 +19,7 @@
 /* ------------------------------------------------------------ */
 #define OTA_TAG "OTA_UPDATE"
 #define BLOCK_SIZE 1024
+#define OTA_HASH_LEN 32   /* SHA-256 hash length */
 
 /* OTA service UUID and characteristic handles */
 #define OTA_SERVICE_UUID   0x1825
@@ -43,6 +44,7 @@ typedef struct {
     void *user_data;
     uint8_t transfer_status;
     uint8_t abort_requested;
+    uint8_t hash_verified;  /* true after finish if hash matches */
 } ota_update_handle_t;
 
 /* ------------------------------------------------------------ */

@@ -68,26 +68,19 @@ esp_err_t fl_aggregate_deltas(fl_delta_t *deltas, int32_t count, int32_t *aggreg
     /* Initialize aggregated output to zero */
     memset(aggregated_output, 0, FL_MODEL_SIZE * sizeof(int32_t));
     
-    /* Accumulate all delta weights */
+    /* Accumulate all delta weights from each device */
     for (int i = 0; i < count; i++) {
         if (deltas[i].delta_json != NULL) {
-            /* In a real implementation, extract weights from JSON and average */
-            /* For this implementation, extract and accumulate weights */
-            ESP_LOGI("FL", "Processing delta from device: %s", deltas[i].device_id);
-        }
-    }
-    
-    /* Compute simple average of all deltas */
-    for (int i = 0; i < count; i++) {
-        if (deltas[i].delta_json != NULL) {
-            /* Extract weight from first element as representative */
-            /* In production, extract all 256 weights from JSON and average */
-            int32_t first_weight = 0;
-            /* For this demo, use a simple placeholder extraction */
-            if (cJSON_IsString(deltas[i].delta_json)) {
-                first_weight = atoi(deltas[i].delta_json->valuestring);
+            /* Extract weights from JSON delta string: comma-separated values */
+            char *delta_str = deltas[i].delta_json->valuestring;
+            char *token = strtok(delta_str, ",");
+            int weight_idx = 0;
+            while (token != NULL && weight_idx < FL_MODEL_SIZE) {
+                int32_t delta_val = atoi(token);
+                aggregated_output[weight_idx] += delta_val;
+                weight_idx++;
+                token = strtok(NULL, ",");
             }
-            aggregated_output[i % FL_MODEL_SIZE] += first_weight;
         }
     }
     

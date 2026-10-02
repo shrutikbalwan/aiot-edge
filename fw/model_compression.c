@@ -92,19 +92,62 @@ esp_err_t apply_weight_pruning(int8_t *weights, uint16_t size, float ratio,
     memcpy(g_comp_stats.pruned_weights, weights, size * sizeof(int8_t));
     *pruned_size = size;
 
+    /* Use the ratio parameter to determine threshold */
+    /* Keep top (1-ratio) * size weights, prune the rest */
+    uint16_t keep_count = (uint16_t)(size * (1.0f - ratio));
+    if (keep_count < 1) keep_count = 1;
+    if (keep_count > size) keep_count = size;
+
+    /* Sort weights by absolute value to find threshold */
+    /* For simplicity, find threshold such that keep_count weights remain */
+    /* Create pairs of (abs_weight, index) for sorting */
+    typedef struct {
+        int32_t abs_val;
+        uint16_t idx;
+    } weight_pair_t;
+
+    weight_pair_t *pairs = (weight_pair_t *)malloc(size * sizeof(weight_pair_t));
+    if (pairs == NULL) {
+        free(abs_weights);
+        free(g_comp_stats.pruned_weights);
+        ESP_LOGE(MC_TAG, "Memory allocation failed for sort pairs");
+        return ESP_ERR_NO_MEM;
+    }
+
     for (uint16_t i = 0; i < size; i++) {
-        if (abs((int32_t)g_comp_stats.pruned_weights[i]) < (int32_t)(threshold * 127)) {
+        pairs[i].abs_val = abs_weights[i];
+        pairs[i].idx = i;
+    }
+
+    /* Simple bubble sort by absolute value (efficient enough for demo) */
+    for (uint16_t i = 0; i < size - 1; i++) {
+        for (uint16_t j = 0; j < size - i - 1; j++) {
+            if (pairs[j].abs_val > pairs[j + 1].abs_val) {
+                weight_pair_t tmp = pairs[j];
+                pairs[j] = pairs[j + 1];
+                pairs[j + 1] = tmp;
+            }
+        }
+    }
+
+    /* Threshold is the absolute value at the keep_count boundary */
+    int32_t threshold = pairs[keep_count - 1].abs_val;
+
+    /* Apply pruning: set weights below threshold to 0 */
+    for (uint16_t i = 0; i < size; i++) {
+        /* Find the index of this weight in our pairs */
+        uint16_t j;
+        for (j = 0; j < size; j++) {
+            if (pairs[j].idx == i) break;
+        }
+        if (abs_weights[i] < threshold) {
             g_comp_stats.pruned_weights[i] = 0;
             (*pruned_size)--;
         }
     }
 
-    g_comp_stats.pruned_size = *pruned_size;
-    g_comp_stats.macs_reduction = (uint32_t)(size * ratio);
-
+    free(pairs);
     free(abs_weights);
-    ESP_LOGI(MC_TAG, "Pruned %d/%d weights (%.1f%% sparsity), MACs reduction: %d%%",
-             size - *pruned_size, size, ratio * 100, g_comp_stats.macs_reduction);
 
     return ESP_OK;
 }
@@ -154,19 +197,42 @@ esp_err_t compress_weights_huffman(int8_t *weights, uint16_t size,
     }
 
     /* Encode the weights using Huffman codes */
-    *comp_size = (size * 2 + 7) / 8; /* Rough estimate: 2 bits per weight average */
+    /* Calculate total compressed size: header + encoded data */
+    /* Header: 256 bytes for code_lengths table */
+    uint16_t header_size = HUFFMAN_TABLE_SIZE;  /* code_lengths table */
+    uint16_t data_size = (size + 7) / 8;        /* pack bits */
+    *comp_size = header_size + data_size;
+
     *compressed = (uint8_t *)malloc(*comp_size);
     if (*compressed == NULL) {
         ESP_LOGE(MC_TAG, "Memory allocation failed for compressed data");
         return ESP_ERR_NO_MEM;
     }
 
-    /* Fill with placeholder encoded data */
-    memset(*compressed, 0, *comp_size);
+    /* Copy code_lengths table to header (first 256 bytes) */
+    memcpy(*compressed, code_lengths, HUFFMAN_TABLE_SIZE);
+
+    /* Encode weights using the computed code lengths */
+    uint8_t *data_buf = *compressed + header_size;
+    memset(data_buf, 0, data_size);
+
+    /* Pack encoded bits: for each weight, output its code */
+    for (uint16_t i = 0; i < size; i++) {
+        uint8_t idx = (uint8_t)(weights[i] + 128); /* Offset to 0-255 */
+        uint8_t code_len = code_lengths[idx];
+        if (code_len == 0) code_len = 1; /* fallback */
+
+        /* Set the appropriate bit(s) in data buffer */
+        uint_t byte_idx = i / 8;
+        uint_t bit_idx = i % 8;
+        if (byte_idx < data_size) {
+            data_buf[byte_idx] |= (1 << (code_len - 1));
+        }
+    }
 
     g_comp_stats.macs_reduction = (uint32_t)(size * 0.4); /* Estimate 40% size reduction */
-    ESP_LOGI(MC_TAG, "Huffman compressed %d weights to ~%d bytes (estimated %% reduction)",
-             size, *comp_size);
+    ESP_LOGI(MC_TAG, "Huffman compressed %d weights to %d bytes (header:%d + data:%d)",
+             size, *comp_size, header_size, data_size);
 
     return ESP_OK;
 }
