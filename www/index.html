@@ -149,11 +149,7 @@
             50% { opacity: 0.5; }
         }
 
-        /* Sensors card */
-        #sensors-card .metric-value {
-            color: var(--primary);
-        }
-
+        /* Health status */
         .health-status {
             display: inline-block;
             padding: 2px 6px;
@@ -166,8 +162,8 @@
         .health-warning { background: #fff4e5; color: var(--warning); }
         .health-critical { background: #fae3e3; color: var(--accent); }
 
-        /* BLE/Cardio status */
- .ble-status {
+        /* BLE status */
+        .ble-status {
             display: inline-block;
             padding: 2px 6px;
             border-radius: 4px;
@@ -177,6 +173,63 @@
         }
         .ble-connected { background: #d5f5e3; color: var(--success); }
         .ble-disconnected { background: #fae3e3; color: var(--accent); }
+
+        /* OTA status */
+        .ota-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .ota-idle { background: #e8e8e8; color: #7f8c8d; }
+        .ota-downloading { background: #3498db; color: white; }
+        .ota-completed { background: var(--success); color: white; }
+        .ota-failed { background: var(--accent); color: white; }
+
+        /* Gauge styles */
+        .gauge {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+        }
+
+        .gauge-bg {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            stroke: #eee;
+            stroke-width: 8;
+            fill: none;
+        }
+
+        .gauge-fill {
+            stroke: var(--success);
+            stroke-width: 8;
+            fill: none;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.3s ease;
+        }
+
+        .gauge-label {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-anchor: middle;
+            font-size: 1.2rem;
+            fill: var(--primary);
+        }
+
+        .gauge-value {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-20%, -20%);
+            text-anchor: middle;
+            font-size: 2.5rem;
+            fill: var(--primary);
+        }
 
         /* Controls */
         .controls {
@@ -204,7 +257,13 @@
         .control-btn[data-action="connect"]:hover { background: var(--success); }
         .control-btn[data-action="disconnect"]:hover { background: var(--accent); }
 
-        /* Instructions */
+        .btn-csv {
+            background: var(--info);
+            margin-left: 0.5rem;
+        }
+
+        .btn-csv:hover { background: #1a75b8; }
+
         .instructions {
             margin-top: 2rem;
             padding: 1rem;
@@ -242,13 +301,21 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
+
 <body>
 
     <header>
         <div class="header-title">
-            <h1><span style="color: #e74c3c;">🎯</span> AIoT-Edge Dashboard</h1>
+            <h1><span style="color: #e74c3c;">dYZ_</span> AIoT-Edge Dashboard</h1>
             <span class="device-id" id="device-id">Simulated Device</span>
         </div>
     </header>
@@ -263,19 +330,28 @@
                     <span class="card-status"><span class="status-dot status-online" id="ppg-status"></span>Online</span>
                 </div>
 
-                <div class="metric-display" id="heart-rate">
-                    <span class="metric-value">72</span>
+                <!-- Gauges -->
+                <div class="gauge" id="hr-gauge">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="gauge-bg" cx="50" cy="50" r="40"/>
+                        <circle class="gauge-fill" id="hr-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+                        <text class="gauge-value" id="hr-value">72</text>
+                        <text class="gauge-label" id="hr-label">bpm</text>
+                    </svg>
+                </div>
+                <div class="metric-display" style="margin-top: 1rem;">
+                    <span class="metric-value" id="heart-rate">72</span>
                     <span class="metric-unit">bpm</span>
                 </div>
                 <div class="metric-label">Heart Rate</div>
 
-                <div class="metric-display" id="spo2">
+                <div class="metric-display" id="spo2-card">
                     <span class="metric-value">98</span>
                     <span class="metric-unit">%</span>
                 </div>
                 <div class="metric-label">SpO2</div>
 
-                <div class="metric-display" id="temperature">
+                <div class="metric-display" id="temperature-card">
                     <span class="metric-value">36.8</span>
                     <span class="metric-unit">°C</span>
                 </div>
@@ -291,20 +367,25 @@
                     <span class="card-status"><span class="status-dot status-online" id="accel-status"></span>Online</span>
                 </div>
 
-                <div class="metric-display" id="accel-x">
-                    <span class="metric-value">0</span>
+                <!-- Gauge for magnitude -->
+                <div class="gauge" id="mag-gauge">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="gauge-bg" cx="50" cy="50" r="40"/>
+                        <circle class="gauge-fill" id="mag-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+                        <text class="gauge-value" id="mag-value">1.00</text>
+                        <text class="gauge-label" id="mag-label">g</text>
+                    </svg>
                 </div>
-                <div class="metric-label">X</div>
 
-                <div class="metric-display" id="accel-y">
-                    <span class="metric-value">0</span>
+                <div class="metric-display" style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>X: <span id="accel-x">0</span></span>
+                        <span>Y: <span id="accel-y">0</span></span>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <span>Z: <span id="accel-z">256</span></span>
+                    </div>
                 </div>
-                <div class="metric-label">Y</div>
-
-                <div class="metric-display" id="accel-z">
-                    <span class="metric-value">256</span>
-                </div>
-                <div class="metric-label">Z</div>
 
                 <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee;">
                     <span>Magnitude: <span id="accel-magnitude">1.00g</span></span>
@@ -324,11 +405,11 @@
                 <div class="metric-label">Wake Word</div>
             </div>
 
-            <!-- OTA & ML Card -->
+            <!-- OTA & System Card -->
             <div class="card" id="ota-card">
                 <div class="card-header">
                     <span class="card-title">System Status</span>
-                    <span class="card-status"><span class="status-dot" id="ota-status"></span>Ready</span>
+                    <span class="card-status"><span class="status-dot ota-status" id="ota-status">Ready</span></span>
                 </div>
 
                 <div class="metric-display" id="fw-version">
@@ -346,6 +427,17 @@
                     <span class="metric-unit"> inferences</span>
                 </div>
                 <div class="metric-label">NN Inferences</div>
+
+                <!-- OTA Progress -->
+                <div style="margin-top: 1rem;">
+                    <div style="font-size: 0.8rem; margin-bottom: 0.5rem;">OTA Update</div>
+                    <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden;">
+                        <div id="ota-progress-bar" style="width: 0%; height: 100%; background: var(--success); transition: width 0.3s;"></div>
+                    </div>
+                    <div style="font-size: 0.7rem; margin-top: 0.3rem;">
+                        <span id="ota-status-text">Ready</span>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -353,6 +445,7 @@
 
     <div class="controls">
         <button class="control-btn" data-action="connect" onclick="connectMQTT()">Connect MQTT</button>
+        <button class="control-btn data-csv" data-action="export-csv" onclick="exportCSV()">Export CSV</button>
         <button class="control-btn" data-action="disconnect" onclick="disconnectMQTT()">Disconnect</button>
     </div>
 
@@ -361,6 +454,7 @@
         <ul>
             <li><b>Connect MQTT:</b> Connect to the MQTT broker to receive live data</li>
             <li><b>Disconnect:</b> Disconnect the MQTT connection</li>
+            <li><b>Export CSV:</b> Download historical data as CSV</li>
             <li>The dashboard simulates data if MQTT is not connected</li>
             <li>Real hardware would publish to: <code>aiot/edge/#</code></li>
         </ul>
@@ -385,16 +479,121 @@
         let connected = false;
         let sensorInterval = null;
         let wakeTimeout = null;
+        let historicalData = { hr: [], spo2: [], temp: [], accel: [] };
+        let maxHistoricalPoints = 50;
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
-            // Set up simulated data updates if MQTT not connected
+            // Restore historical data from localStorage
+            restoreHistoricalData();
             startSimulatedData();
             updateConnectionStatus(false);
 
             // Buttons
             document.querySelector('[data-action="connect"]').disabled = false;
             document.querySelector('[data-action="disconnect"]').disabled = true;
+            document.querySelector('[data-action="export-csv"]').disabled = false;
+        });
+
+        // Export CSV functionality
+        function exportCSV() {
+            // Generate CSV from historical data
+            let csv = "Timestamp,HeartRate,SpO2,Temperature,AccelX,AccelY,AccelZ,WakeWordDetected\n";
+            
+            // Reverse order (oldest first)
+            for (let i = historicalData.hr.length - 1; i >= 0; i--) {
+                const timestamp = new Date(Date.now() - (historicalData.hr.length - 1 - i) * 1000);
+                csv += `${timestamp.toISOString()},`;
+                csv += `${historicalData.hr[i]},`;
+                csv += `${historicalData.spo2[i]},`;
+                csv += `${historicalData.temp[i].toFixed(1)},`;
+                csv += `${historicalData.accel[i].x},`;
+                csv += `${historicalData.accel[i].y},`;
+                csv += `${historicalData.accel[i].z},`;
+                csv += `${historicalData.wake[i] ? '1' : '0'}\n`;
+            }
+
+            // Trigger download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'aiot-edge-dashboard-history.csv');
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Restore historical data from localStorage
+        function restoreHistoricalData() {
+            const stored = localStorage.getItem('aiotEdgeHistory');
+            if (stored) {
+                historicalData = JSON.parse(stored);
+                // Limit points
+                const max = maxHistoricalPoints;
+                const keys = ['hr', 'spo2', 'temp', 'accel', 'wake'];
+                for (const key of keys) {
+                    if (historicalData[key].length > max) {
+                        historicalData[key] = historicalData[key].slice(-max);
+                    }
+                }
+                updateGaugesFromHistory();
+            }
+        }
+
+        // Save historical data to localStorage
+        function saveHistoricalData() {
+            localStorage.setItem('aiotEdgeHistory', JSON.stringify(historicalData));
+        }
+
+        // Add data point to history
+        function addDataPoint(hr, spo2, temp, accel, wake) {
+            // Shift data and add new point
+            if (historicalData.hr.length >= maxHistoricalPoints) {
+                historicalData.hr.shift();
+                historicalData.spo2.shift();
+                historicalData.temp.shift();
+                historicalData.accel.shift();
+                historicalData.wake.shift();
+            }
+            historicalData.hr.push(hr);
+            historicalData.spo2.push(spo2);
+            historicalData.temp.push(temp);
+            historicalData.accel.push({x: accel.x, y: accel.y, z: accel.z});
+            historicalData.wake.push(wake);
+            saveHistoricalData();
+        }
+
+        // Initialize gauges from history
+        function updateGaugesFromHistory() {
+            if (historicalData.hr.length > 0) {
+                const lastHr = historicalData.hr[historicalData.hr.length - 1];
+                const lastSpo2 = historicalData.spo2[historicalData.spo2.length - 1];
+                const lastTemp = historicalData.temp[historicalData.temp.length - 1];
+                
+                // Update gauge fills
+                const hrPercent = Math.min(100, (lastHr / 180) * 100);
+                document.getElementById('hr-fill').style.strokeDashoffset = 251.2 * (1 - hrPercent / 100);
+                document.getElementById('hr-value').textContent = Math.round(lastHr);
+                
+                document.getElementById('spo2-card').querySelector('.metric-value').textContent = Math.round(lastSpo2);
+                
+                const tempPercent = Math.min(100, (lastTemp / 40) * 100);
+                // For temp we just show the value
+                document.getElementById('temperature-card').querySelector('.metric-value').textContent = lastTemp.toFixed(1);
+            }
+        }
+
+        /* Initialize dashboard */
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up simulated data updates if MQTT not connected
+            startSimulatedData();
+            updateConnectionStatus(false);
+            updateGaugesFromHistory();
+
+            // Buttons
+            document.querySelector('[data-action="connect"]').disabled = false;
+            document.querySelector('[data-action="disconnect"]').disabled = true;
+            document.querySelector('[data-action="export-csv"]').disabled = false;
         });
 
         // Connect to MQTT (simulated for demo)
@@ -431,6 +630,7 @@
             sensorInterval = setInterval(function() {
                 updateSensorData();
                 updateWakeWordStatus();
+                updateBLEStatus();
             }, 100); /* 10 Hz */
 
             wakeTimeout = setInterval(function() {
@@ -439,31 +639,56 @@
             }, 5000 + Math.random() * 2000);
         }
 
+        // Update BLE status display
+        function updateBLEStatus() {
+            const bleStatus = document.createElement('span');
+            bleStatus.className = 'ble-status ' + (connected ? 'ble-connected' : 'ble-disconnected');
+            bleStatus.textContent = connected ? 'BLE Connected' : 'BLE Disconnected';
+            
+            // Insert into OTA card or create status area
+            const otaCard = document.getElementById('ota-card');
+            const existing = document.querySelector('.ble-status-display');
+            if (existing) existing.remove();
+            const span = document.createElement('span');
+            span.className = 'ble-status-display ble-status ' + (connected ? 'ble-connected' : 'ble-disconnected');
+            span.textContent = connected ? 'BLE Connected' : 'BLE Disconnected';
+            otaCard.querySelector('.metric-display').appendChild(span);
+        }
+
         // Update all sensor readings
         function updateSensorData() {
             // Simulate heart rate (60-100 bpm, realistic variation)
             const hr = 60 + Math.random() * 40;
-            document.getElementById('heart-rate').querySelector('.metric-value').textContent = Math.round(hr);
+            const hrRound = Math.round(hr);
+            document.getElementById('heart-rate').querySelector('.metric-value').textContent = hrRound;
+            
+            // Add to history
+            addDataPoint(hrRound, null, null, null, null);
 
             // Simulate SpO2 (95-100%)
             const spo2 = 95 + Math.random() * 5;
             document.getElementById('spo2').querySelector('.metric-value').textContent = Math.round(spo2);
+            addDataPoint(null, spo2, null, null, null);
 
             // Simulate temperature (35-40°C)
             const temp = (35 + Math.random() * 5).toFixed(1);
             document.getElementById('temperature').querySelector('.metric-value').textContent = temp;
+            addDataPoint(null, null, temp, null, null);
 
             // Simulate accelerometer
             const x = Math.round((Math.random() - 0.5) * 200);
             const y = Math.round((Math.random() - 0.5) * 200);
-            const z = 256 + Math.round((Math.random() - 0.5) * 50); /* ~1g */
-
+            const z = 256 + Math.round((Math.random() - 0.5) * 50); /* ~1g + noise */
+            
             document.getElementById('accel-x').querySelector('.metric-value').textContent = x;
             document.getElementById('accel-y').querySelector('.metric-value').textContent = y;
             document.getElementById('accel-z').querySelector('.metric-value').textContent = z;
 
             const magnitude = Math.sqrt(x*x + y*y + z*z) / 256.0;
             document.getElementById('accel-magnitude').textContent = magnitude.toFixed(2) + 'g';
+            
+            // Add to history
+            addDataPoint(null, null, null, {x, y, z}, null);
 
             // Health status
             const hrVal = Math.round(hr);
@@ -481,9 +706,9 @@
                 healthBar.textContent = 'Critical';
             }
 
-            // Accelerometer status
-            const accelStatus = document.getElementById('accel-status');
-            accelStatus.className = 'status-dot ' + (Math.abs(x) < 50 && Math.abs(y) < 50 && z > 200 ? 'status-online' : 'status-online');
+            // Accelerometer magnitude
+            const magnitude = Math.sqrt(x*x + y*y + z*z) / 256.0;
+            document.getElementById('accel-magnitude').textContent = magnitude.toFixed(2) + 'g';
         }
 
         // Update wake word status
@@ -564,22 +789,35 @@
                 // Update dashboard from MQTT status message
                 if (payloadObj.heart_rate !== undefined) {
                     document.getElementById('heart-rate').querySelector('.metric-value').textContent = payloadObj.heart_rate;
+                    addDataPoint(payloadObj.heart_rate, null, null, null, null);
                 }
                 if (payloadObj.spo2 !== undefined) {
                     document.getElementById('spo2').querySelector('.metric-value').textContent = payloadObj.spo2;
+                    addDataPoint(null, payloadObj.spo2, null, null, null);
                 }
                 if (payloadObj.temperature !== undefined) {
                     document.getElementById('temperature').querySelector('.metric-value').textContent = payloadObj.temperature.toFixed(1);
+                    addDataPoint(null, null, payloadObj.temperature, null, null);
                 }
                 if (payloadObj.accel_x !== undefined) {
                     document.getElementById('accel-x').querySelector('.metric-value').textContent = payloadObj.accel_x;
                     document.getElementById('accel-y').querySelector('.metric-value').textContent = payloadObj.accel_y;
                     document.getElementById('accel-z').querySelector('.metric-value').textContent = payloadObj.accel_z;
+                    addDataPoint(null, null, null, {x: payloadObj.accel_x, y: payloadObj.accel_y, z: payloadObj.accel_z}, null);
                 }
                 if (payloadObj.wake_word_detected !== undefined) {
                     const wakeDisplay = document.getElementById('wake-word-status');
                     wakeDisplay.innerHTML = payloadObj.wake_word_detected ? '🔔 WAKE' : '-- -- --';
                     wakeDisplay.style.color = payloadObj.wake_word_detected ? '#e74c3c' : '#666';
+                }
+                if (payloadObj.battery_pct !== undefined) {
+                    // Could add battery indicator
+                }
+                if (payloadObj.cpu_pct !== undefined) {
+                    // Could add CPU indicator
+                }
+                if (payloadObj.mem_free_kb !== undefined) {
+                    // Could add memory indicator
                 }
             }
 
@@ -590,11 +828,36 @@
 
             if (topic === TOPICS.ota) {
                 // OTA update event
-                console.log('OTA update received:', payload);
+                updateOTAStatus(payload);
             }
         }
 
-        // Example: Simulate receiving an MQTT message
+        // Update OTA status
+        function updateOTAStatus(payload) {
+            const otaStatusText = document.getElementById('ota-status-text');
+            const otaProgressBar = document.getElementById('ota-progress-bar');
+            
+            if (payload.status === 'start') {
+                otaStatusText.textContent = 'Starting OTA';
+                otaStatus.className = 'ota-status ota-downloading';
+                otaProgressBar.style.width = '0%';
+            } else if (payload.status === 'progress') {
+                otaStatusText.textContent = `Updating ${payload.percentage}%`;
+                otaStatus.className = 'ota-status ota-downloading';
+                otaProgressBar.style.width = `${payload.percentage}%`;
+            } else if (payload.status === 'success') {
+                otaStatusText.textContent = 'OTA Complete';
+                otaStatus.className = 'ota-status ota-completed';
+                otaProgressBar.style.width = '100%';
+                setTimeout(() => { otaStatusText.textContent = 'Ready'; otaStatus.className = 'ota-status ota-idle'; }, 2000);
+            } else if (payload.status === 'failure') {
+                otaStatusText.textContent = 'OTA Failed';
+                otaStatus.className = 'ota-status ota-failed';
+                setTimeout(() => { otaStatusText.textContent = 'Ready'; otaStatus.className = 'ota-status ota-idle'; }, 2000);
+            }
+        }
+
+        // Simulate MQTT message
         function simulateMQTTMessage() {
             const sampleStatus = {
                 heart_rate: Math.round(60 + Math.random() * 40),
@@ -606,7 +869,9 @@
                 wake_word_detected: Math.random() > 0.9,
                 battery_pct: 80 + Math.random() * 15,
                 cpu_pct: 10 + Math.random() * 30,
-                mem_free_kb: 200 + Math.random() * 300
+                mem_free_kb: 200 + Math.random() * 300,
+                status: Math.random() > 0.95 ? 'progress' : undefined,
+                percentage: Math.random() * 100
             };
 
             receiveMQTTMessage(TOPICS.status, JSON.stringify(sampleStatus));
