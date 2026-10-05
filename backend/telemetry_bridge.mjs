@@ -27,7 +27,9 @@ export function validateBridgeConfig(environment) {
   if (!/^mqtts:\/\//.test(brokerUrl) && environment.AIOT_ALLOW_PLAINTEXT_MQTT !== "1") {
     throw new Error("AIOT_MQTT_URL must use mqtts:// unless plaintext is explicitly enabled");
   }
-  if (token.length < 32) throw new Error("AIOT_WS_TOKEN must contain at least 32 characters");
+  if (!/^[A-Za-z0-9._~-]{32,128}$/.test(token)) {
+    throw new Error("AIOT_WS_TOKEN must be a 32-128 character URL-safe token");
+  }
   const port = Number(environment.AIOT_WS_PORT ?? "8080");
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("invalid AIOT_WS_PORT");
   return {

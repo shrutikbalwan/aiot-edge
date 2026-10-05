@@ -10,10 +10,10 @@ Health outputs are engineering demonstrations, not medical devices or diagnoses.
 |---|---|---|
 | Host signal processing | Verified | Native C test covers nominal, short, null, and flat windows. |
 | Python/ML smoke pipeline | Verified | Pytest converts a full-int8 model, executes TFLite inference, and compiles the generated complete C array. |
-| Dashboard parser/history | Verified | Node syntax check and three unit tests. |
+| Dashboard and telemetry relay | Verified | Node syntax checks and six unit tests cover parsing, bounded history, relay configuration, authorization, and payload limits. |
 | ESP32-S3 project structure | Verified | Clean default build completed with the official `espressif/idf:v5.1.6` environment; optional NimBLE/MQTT/OTA configuration also compiles. |
 | MAX30102/MAX30205/BMI160 drivers | Implemented, hardware validation pending | Correct 7-bit addressing and bounded decoding; physical buses are untested. |
-| NimBLE peripheral, MQTT, HTTPS OTA | Implemented, hardware validation pending | Optional and disabled by default; interoperability and provisioning require hardware/network testing. |
+| Wi-Fi, NimBLE, MQTT commands, HTTPS OTA | Implemented, hardware validation pending | Optional and disabled by default; runtime credential APIs exist, but product provisioning and interoperability require hardware/network testing. |
 | CPU model-runtime adapter | Experimental | Interface exists; a production TFLite Micro/ESP-NN backend is not bundled. |
 | Real wake-word dataset and device benchmark | Planned | Synthetic accuracy is only a pipeline smoke result. |
 
@@ -24,7 +24,8 @@ No custom ASIC, accelerator RTL, synthesis, timing closure, PUF implementation, 
 ```text
 Sensors -> sensor queue -> health processing -> MQTT/BLE telemetry
 Audio   -> feature extraction -> model runtime -> wake event
-Commands -> MQTT/BLE bounded validation -> logged candidate (action dispatch disabled)
+MQTT commands -> bounded validation -> authenticated dispatcher -> status/OTA/reboot
+BLE commands  -> bounded validation -> rejected until product BLE authorization exists
 ```
 
 Resources are created before tasks. The sensor task owns sensor reads, the queue transfers initialized samples, and the processing task owns its complete PPG window. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -32,7 +33,7 @@ Resources are created before tasks. The sensor task owns sensor reads, the queue
 ## Hardware
 
 - ESP32-S3 only
-- 4 MB or larger flash (the default partition table provides factory plus two 1 MB OTA slots)
+- 4 MB or larger flash (the default partition table provides two 1,966,080-byte OTA slots with rollback metadata; there is no separate factory slot)
 - MAX30102 at 7-bit address `0x57`
 - MAX30205 at configured base address `0x48`
 - BMI160 at `0x68` or `0x69`
@@ -61,7 +62,7 @@ idf.py fullclean
 idf.py build
 ```
 
-Use `idf.py menuconfig` under **AIoT-Edge** to disable simulation, choose the BMI160 address, or enable optional transports. Enabling NimBLE also requires the ESP-IDF NimBLE host option. Copy values from `config/examples/sdkconfig.defaults.local.example`; do not commit a generated `sdkconfig` containing secrets.
+Use `idf.py menuconfig` under **AIoT-Edge** to disable simulation, choose the BMI160 address, or enable optional transports. Enabling NimBLE also requires the ESP-IDF NimBLE host option. Copy values from `config/examples/sdkconfig.defaults.local.example`; do not commit a generated `sdkconfig` containing secrets. `network_manager_provision_wifi()` and `mqtt_transport_provision_password()` are integration APIs for a trusted local/manufacturing provisioning flow; this repository intentionally does not expose credentials through BLE, HTTP, or a shell.
 
 ## Simulation and hardware setup
 
@@ -78,11 +79,11 @@ Topics are versioned:
 - `aiot/v1/devices/{device_id}/commands` — QoS 1 subscription; publishers should not retain commands
 - `aiot/v1/devices/{device_id}/ota/status` — QoS 1 (reserved)
 
-For local Mosquitto development, simulation builds may use `mqtt://<LAN-IP>:1883`. Production configuration must use `mqtts://`; the code attaches the ESP certificate bundle and does not bypass hostname checks. Usernames can come from Kconfig for development, but passwords/private keys must be provisioned outside tracked files. The dashboard consumes a backend WebSocket JSON stream rather than embedding broker credentials; see [docs/MQTT_AND_DASHBOARD.md](docs/MQTT_AND_DASHBOARD.md).
+For local Mosquitto development, simulation builds may use `mqtt://<LAN-IP>:1883`. Production configuration must use `mqtts://`; the code attaches the ESP certificate bundle and does not bypass hostname checks. Usernames can come from Kconfig for development, while the password is read from NVS. Command subscription requires TLS, a username, a runtime password, and `CONFIG_AIOT_COMMANDS_ENABLED`; broker ACLs must restrict the command topic to authorized publishers. The dashboard consumes the included authenticated backend WebSocket relay rather than embedding broker credentials; see [docs/MQTT_AND_DASHBOARD.md](docs/MQTT_AND_DASHBOARD.md).
 
 ## BLE and OTA
 
-NimBLE exposes explicit, versioned binary telemetry and JSON command candidates. Notifications occur only while connected and subscribed, and payload size is checked against the negotiated MTU. Firmware bytes are not transferred over BLE. Because product authentication and authorization are not provisioned, received commands are validated and logged but do not execute device actions. See [docs/BLE_PROTOCOL.md](docs/BLE_PROTOCOL.md).
+NimBLE exposes explicit, versioned binary telemetry and JSON command candidates. Notifications occur only while connected and subscribed, and payload size is checked against the negotiated MTU. Firmware bytes are not transferred over BLE. BLE commands are schema-validated and then rejected because transport encryption alone is not product authorization. See [docs/BLE_PROTOCOL.md](docs/BLE_PROTOCOL.md).
 
 OTA accepts HTTPS URLs only, uses the certificate bundle, inspects the downloaded image description, rejects a version mismatch/downgrade by default, relies on ESP-IDF image verification, and selects the update partition only after `esp_https_ota_finish`. Secure Boot v2, flash encryption, eFuse secure version, and rollback behavior require physical provisioning and validation.
 
@@ -105,7 +106,7 @@ Outputs are `wake_word.tflite`, `metadata.json`, `labels.txt`, `evaluation.json`
 
 ## Dashboard
 
-Serve `www/` with any static server. It starts OFFLINE. Enter a `ws://`/`wss://` backend endpoint for live JSON or explicitly start deterministic simulation. Live payloads must use schema version 1; malformed and stale states are visible. Browser history is capped at 100 samples and CSV export preserves the live/simulation label.
+Run `npm run bridge` with `AIOT_MQTT_URL`, a URL-safe 32-128 character `AIOT_WS_TOKEN`, and any broker credentials in the process environment. The relay binds to `127.0.0.1` by default; put it behind a TLS reverse proxy for remote browser access. Serve `www/` with any static server, enter the resulting `ws://`/`wss://` `/telemetry` endpoint and relay token, or explicitly start deterministic simulation. The page starts OFFLINE, never stores the token, rejects simulated or malformed live payloads, marks stale data, caps local history at 100 samples, and labels CSV rows by source.
 
 ## Tests
 
@@ -132,7 +133,7 @@ Use `-SkipIdf` / `--skip-idf` only when ESP-IDF is unavailable; the script then 
 
 ## Security limitations
 
-This repository does not provision Wi-Fi, broker credentials, client certificates, Secure Boot, flash encryption, or eFuses. MQTT command authentication depends on the provisioned broker/TLS identity. BLE pairing/access-control policy still needs hardware threat-model validation. See [SECURITY.md](SECURITY.md).
+This repository provides NVS storage APIs but not an end-user provisioning channel. Without ESP32-S3 flash encryption, NVS credentials are not protected against physical flash extraction. It also does not provision client certificates, Secure Boot, flash encryption, or eFuses. MQTT command authorization depends on the provisioned broker identity and broker ACLs. BLE command execution remains disabled pending a product-specific pairing and authorization design. See [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
 

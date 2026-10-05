@@ -7,6 +7,7 @@ const token = "0123456789abcdef0123456789abcdef";
 test("requires TLS and a strong browser relay token", () => {
   assert.throws(() => validateBridgeConfig({AIOT_MQTT_URL: "mqtt://broker", AIOT_WS_TOKEN: token}));
   assert.throws(() => validateBridgeConfig({AIOT_MQTT_URL: "mqtts://broker", AIOT_WS_TOKEN: "short"}));
+  assert.throws(() => validateBridgeConfig({AIOT_MQTT_URL: "mqtts://broker", AIOT_WS_TOKEN: `${"a".repeat(31)} `}));
   const config = validateBridgeConfig({AIOT_MQTT_URL: "mqtts://broker", AIOT_WS_TOKEN: token});
   assert.equal(config.topic, "aiot/v1/devices/+/telemetry");
 });

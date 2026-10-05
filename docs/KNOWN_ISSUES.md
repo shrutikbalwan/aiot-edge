@@ -28,11 +28,12 @@ The working tree was clean (`main...origin/main`) before the audit. Every tracke
 
 - Physical MAX30102, MAX30205, and BMI160 initialization and readings require board validation.
 - BLE advertising, subscription, notification, MTU, and reconnect behavior require an ESP32-S3 and a BLE central.
-- MQTT TLS interoperability and HTTPS OTA require provisioned Wi-Fi plus a real broker/server certificate chain.
+- Wi-Fi association, MQTT TLS interoperability, broker ACL behavior, and HTTPS OTA require provisioned hardware plus real network services and certificate chains.
 - Secure Boot v2, flash encryption, anti-rollback, rollback confirmation, and eFuse provisioning require deliberate hardware provisioning and cannot be validated in host tests.
 - Health values are educational estimates and are not clinically validated or suitable for diagnosis.
 - Wake-word accuracy on real recordings and device inference latency remain unmeasured.
-- MQTT/BLE command payloads are bounded and schema-validated, but action dispatch is intentionally disabled until a product authentication and authorization policy is implemented.
+- MQTT commands execute only behind verified TLS, runtime username/password credentials, the command feature flag, and the broker's external ACL. This security boundary and destructive command behavior require hardware/integration testing. BLE commands remain rejected until a product BLE authorization policy exists.
+- Wi-Fi and MQTT secrets stored in NVS require flash encryption to resist physical extraction. The repository exposes trusted provisioning APIs but no end-user provisioning UI or protocol.
 - The local WSL image uses Python 3.14 and has no compatible TensorFlow installation, so a full local `verify.sh` run stops at ML test collection. Its shell syntax passes; CI installs the pinned environment on Python 3.13. The Windows `verify.ps1` workflow passes locally.
 
 The rewritten default firmware and the optional NimBLE/MQTT/OTA profile both build with the official ESP-IDF 5.1.6 container. The host shell still has no exported `idf.py`, so native invocation remains an environment limitation rather than a firmware failure. Current commands are maintained in the root `README.md` and verification scripts. Historical claims are not evidence.

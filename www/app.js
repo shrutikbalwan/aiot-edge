@@ -100,9 +100,9 @@ if (typeof document !== "undefined") {
   const connect = () => {
     stopSimulation();
     const endpoint = elements.endpoint.value.trim();
-    if (!/^wss?:\/\//.test(endpoint)) { setState("ERROR", "error", "Enter a ws:// or wss:// backend URL"); return; }
     const accessToken = elements["access-token"].value.trim();
-    if (accessToken.length < 32) { setState("ERROR", "error", "Enter the short-lived dashboard access token"); return; }
+    if (!/^wss?:\/\//.test(endpoint)) { setState("ERROR", "error", "Enter a ws:// or wss:// backend URL"); return; }
+    if (!/^[A-Za-z0-9._~-]{32,128}$/.test(accessToken)) { setState("ERROR", "error", "Enter a 32-128 character URL-safe access token"); return; }
     localStorage.setItem("aiotEndpoint", endpoint);
     setState("CONNECTING", "offline", "Connecting to backend…");
     socket = new WebSocket(endpoint, ["aiot-v1", accessToken]);

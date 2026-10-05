@@ -39,4 +39,4 @@ Writes are UTF-8 JSON capped at 512 bytes. Every command includes `"schema":1`. 
 {"schema":1,"command":"ota","url":"https://updates.example/firmware.bin","version":"1.2.3"}
 ```
 
-An OTA URL must use HTTPS. The current characteristic validates and logs this candidate; it does not dispatch an update and is not BLE firmware transfer. Authentication/authorization policy must be added and validated for the product threat model before enabling remote actions.
+An OTA URL must use HTTPS. The characteristic validates the candidate and submits it with an unauthenticated BLE source marker; the shared dispatcher rejects it. This is not BLE firmware transfer. Product-specific identity, pairing, authorization, replay protection, and hardware validation are required before BLE command execution may be enabled.
