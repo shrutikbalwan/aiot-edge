@@ -5,6 +5,7 @@
 #include "aiot_types.h"
 #include "audio_features.h"
 #include "ble_transport.h"
+#include "command_dispatcher.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -13,6 +14,7 @@
 #include "freertos/task.h"
 #include "model_runtime.h"
 #include "mqtt_transport.h"
+#include "network_manager.h"
 #include "nvs_flash.h"
 #include "ota_manager.h"
 #include "sensor_driver.h"
@@ -112,6 +114,8 @@ void app_main(void)
     ESP_ERROR_CHECK(audio_features_init());
     ESP_ERROR_CHECK(model_runtime_init());
     ESP_ERROR_CHECK(ota_manager_init());
+    ESP_ERROR_CHECK(command_dispatcher_init());
+    ESP_ERROR_CHECK(network_manager_init());
     ESP_ERROR_CHECK(mqtt_transport_init());
     ESP_ERROR_CHECK(aiot_ble_transport_init());
 

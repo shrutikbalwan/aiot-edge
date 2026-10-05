@@ -3,7 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "node --check www/app.js && node --check tests/dashboard.test.mjs",
-    "test": "node tests/dashboard.test.mjs"
+    "lint": "node --check www/app.js && node --check backend/telemetry_bridge.mjs && node --check tests/dashboard.test.mjs && node --check tests/backend.test.mjs",
+    "test": "node --test tests/dashboard.test.mjs tests/backend.test.mjs",
+    "bridge": "node backend/telemetry_bridge.mjs"
+  },
+  "dependencies": {
+    "mqtt": "5.16.0",
+    "ws": "8.22.0"
   }
 }

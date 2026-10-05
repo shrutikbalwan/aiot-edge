@@ -45,7 +45,7 @@ export function csvForHistory(history) {
 }
 
 if (typeof document !== "undefined") {
-  const elements = Object.fromEntries(["mode", "endpoint", "connect", "disconnect", "simulation", "export",
+  const elements = Object.fromEntries(["mode", "endpoint", "access-token", "connect", "disconnect", "simulation", "export",
     "connection-status", "heart-rate", "spo2", "temperature", "acceleration", "wake", "age", "history"]
     .map((id) => [id, document.getElementById(id)]));
   let socket = null;
@@ -101,9 +101,11 @@ if (typeof document !== "undefined") {
     stopSimulation();
     const endpoint = elements.endpoint.value.trim();
     if (!/^wss?:\/\//.test(endpoint)) { setState("ERROR", "error", "Enter a ws:// or wss:// backend URL"); return; }
+    const accessToken = elements["access-token"].value.trim();
+    if (accessToken.length < 32) { setState("ERROR", "error", "Enter the short-lived dashboard access token"); return; }
     localStorage.setItem("aiotEndpoint", endpoint);
     setState("CONNECTING", "offline", "Connecting to backend…");
-    socket = new WebSocket(endpoint);
+    socket = new WebSocket(endpoint, ["aiot-v1", accessToken]);
     elements.connect.disabled = true;
     elements.disconnect.disabled = false;
     socket.addEventListener("open", () => { reconnectAttempt = 0; setState("LIVE", "live", "Connected; waiting for telemetry"); });
