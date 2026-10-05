@@ -5,11 +5,25 @@ ml/models/*.tflite
 ml/models/metadata.json
 ml/models/labels.txt
 ml/models/nn_weights.h
+ml/models/evaluation.json
+ml/models/wake_word_model.c
+ml/models/wake_word_model.h
+__pycache__/
+.pytest_cache/
+.test-tmp/
+tests/runtime/*
+!tests/runtime/.gitkeep
 
 # Build outputs (build with: idf.py build)
 *.elf
 *.bin
 *.hex
+build/
+build-features/
+baseline-cmake-build/
+sdkconfig
+sdkconfig.old
+sdkconfig.features
 
 # Environment-specific
 .idea/
@@ -30,3 +44,4 @@ ml/models/nn_weights.h
 # OS generated
 Thumbs.db
 Desktop.ini
+node_modules/

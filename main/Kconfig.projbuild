@@ -1,0 +1,79 @@
+menu "AIoT-Edge"
+
+config AIOT_SIMULATION
+    bool "Use deterministic simulated sensor/audio input"
+    default y
+
+config AIOT_SIMULATION_RANDOM_DEMO
+    bool "Randomize simulation for demonstrations"
+    depends on AIOT_SIMULATION
+    default n
+
+config AIOT_BLE_ENABLED
+    bool "Enable NimBLE GATT peripheral"
+    depends on BT_NIMBLE_ENABLED
+    default n
+
+config AIOT_MQTT_ENABLED
+    bool "Enable MQTT transport"
+    default n
+
+config AIOT_OTA_ENABLED
+    bool "Enable verified HTTPS OTA command handling"
+    depends on AIOT_MQTT_ENABLED
+    default n
+
+config AIOT_I2C_PORT
+    int "I2C controller number"
+    range 0 1
+    default 0
+
+config AIOT_I2C_SDA_GPIO
+    int "I2C SDA GPIO"
+    range 0 48
+    default 8
+
+config AIOT_I2C_SCL_GPIO
+    int "I2C SCL GPIO"
+    range 0 48
+    default 9
+
+config AIOT_BMI160_ADDRESS
+    hex "BMI160 7-bit address"
+    range 0x68 0x69
+    default 0x68
+
+config AIOT_MQTT_BROKER_URI
+    string "MQTT broker URI"
+    default "mqtt://192.168.1.2:1883"
+    depends on AIOT_MQTT_ENABLED
+
+config AIOT_MQTT_USERNAME
+    string "MQTT username (leave empty when unused)"
+    default ""
+    depends on AIOT_MQTT_ENABLED
+
+config AIOT_MQTT_CERT_SOURCE
+    string "Certificate source description"
+    default "ESP certificate bundle"
+    depends on AIOT_MQTT_ENABLED
+
+config AIOT_DEVICE_ID
+    string "Device identifier"
+    default "esp32s3-dev"
+
+config AIOT_TOPIC_PREFIX
+    string "MQTT topic prefix"
+    default "aiot/v1"
+
+config AIOT_TELEMETRY_INTERVAL_MS
+    int "Telemetry interval in milliseconds"
+    range 1000 3600000
+    default 5000
+
+config AIOT_ALLOW_OTA_DOWNGRADE
+    bool "Allow explicit firmware downgrade"
+    default n
+    depends on AIOT_OTA_ENABLED
+
+endmenu
