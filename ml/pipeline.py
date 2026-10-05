@@ -19,6 +19,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
 
 FEATURE_COUNT = 40
 SEED = 20261004
@@ -130,7 +131,11 @@ def convert_integer_tflite(model: tf.keras.Model, representative: np.ndarray) ->
         return model(features, training=False)
 
     concrete = serving.get_concrete_function()
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([concrete], model)
+    # Freeze trained resource variables before calibration. Passing a live Keras
+    # model here can leave READ_VARIABLE ops in the SavedModel conversion path,
+    # which fails on headless Linux TFLite calibrators.
+    frozen = convert_variables_to_constants_v2(concrete)
+    converter = tf.lite.TFLiteConverter.from_concrete_functions([frozen])
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.representative_dataset = lambda: _representative_samples(representative)
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
