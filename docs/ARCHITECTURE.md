@@ -14,16 +14,18 @@ health processing task -- complete 100-sample window at explicit sample rate
 
 audio source (future hardware adapter) -> audio_features -> model_runtime -> wake event
 
-MQTT or BLE command -> bounded schema parser -> logged candidate
-                                                |
-                                                +-> action dispatcher (planned after authentication)
+MQTT command -> bounded schema parser -> TLS/credential gate -> command queue
+                                                           -> status/OTA/reboot
+BLE command  -> bounded schema parser -> authorization denied (no product ACL)
 ```
 
 ## Resource lifecycle
 
 `app_main` initializes NVS, the sensor queue, event group, components, and only then starts tasks. Every allocation and task result is checked. The sensor task is priority 5 with a 4096-byte stack and runs every 100 ms using `xTaskDelayUntil`. The processing task is priority 4 with a 4096-byte stack and blocks on the queue. The OTA task, when enabled, is priority 3 with an 8192-byte stack and yields during download.
 
-The queue transfers values, not pointers. The producer owns a sample until `xQueueOverwrite` copies it; the consumer owns its received copy and window. OTA status is the only mutex-protected state. Network callbacks validate and log commands without executing them. A future dispatcher must enforce product authentication/authorization and hand work to a task rather than block a network callback.
+The sensor queue transfers values, not pointers. The producer owns a sample until `xQueueOverwrite` copies it; the consumer owns its received copy and window. OTA status is the only mutex-protected state. Network callbacks do bounded validation and enqueue authenticated MQTT commands without blocking. The dispatcher task owns execution. BLE writes use the same parser but are denied because the repository has no product BLE identity or ACL.
+
+Wi-Fi station credentials and the MQTT password are loaded from a dedicated NVS namespace. Missing credentials leave networking offline without affecting local sensing. Disconnects schedule a one-shot timer with bounded exponential backoff. The provisioning functions are library integration points, not a remotely exposed provisioning service.
 
 ## Error behavior
 

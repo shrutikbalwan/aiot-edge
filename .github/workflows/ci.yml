@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+      - run: npm ci
       - run: pip install -r requirements-ml.txt
       - run: python -m compileall ml tests scripts
       - run: python -m pytest

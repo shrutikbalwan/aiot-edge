@@ -4,19 +4,27 @@
 #include <string.h>
 
 #include "aiot_serialization.h"
+#include "command_dispatcher.h"
+#include "credential_policy.h"
 #include "esp_check.h"
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
+#include "nvs.h"
 
 #define MQTT_PAYLOAD_MAX 512U
 #define MQTT_TOPIC_MAX 160U
 #define MQTT_RECONNECT_TIMEOUT_MS 5000U
+#define MQTT_CREDENTIAL_NAMESPACE "aiot_network"
+#define MQTT_PASSWORD_KEY "mqtt_pass"
+#define MQTT_PASSWORD_MAX 128U
 
 static const char *TAG = "mqtt_transport";
 #if CONFIG_AIOT_MQTT_ENABLED
 static esp_mqtt_client_handle_t s_client;
 static bool s_connected;
+static bool s_commands_authenticated;
+static char s_password[MQTT_PASSWORD_MAX + 1U];
 #endif
 static char s_telemetry_topic[MQTT_TOPIC_MAX];
 static char s_command_topic[MQTT_TOPIC_MAX];
@@ -45,8 +53,11 @@ static void handle_command(const esp_mqtt_event_handle_t event)
         ESP_LOGW(TAG, "rejected malformed MQTT command: %s", esp_err_to_name(err));
         return;
     }
-    ESP_LOGI(TAG, "validated MQTT command kind=%d", command.kind);
-    /* Dispatch is deliberately explicit; reboot and OTA are not executed in the MQTT callback. */
+    const esp_err_t dispatch = command_dispatcher_submit(&command,
+        AIOT_COMMAND_SOURCE_MQTT, s_commands_authenticated);
+    if (dispatch != ESP_OK) {
+        ESP_LOGW(TAG, "MQTT command dispatch rejected: %s", esp_err_to_name(dispatch));
+    }
 }
 
 static void mqtt_event(void *argument, esp_event_base_t base, int32_t event_id,
@@ -58,7 +69,8 @@ static void mqtt_event(void *argument, esp_event_base_t base, int32_t event_id,
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         s_connected = true;
-        if (esp_mqtt_client_subscribe(s_client, s_command_topic, 1) < 0) {
+        if (s_commands_authenticated &&
+            esp_mqtt_client_subscribe(s_client, s_command_topic, 1) < 0) {
             ESP_LOGE(TAG, "command subscription failed");
         }
         break;
@@ -77,6 +89,26 @@ static void mqtt_event(void *argument, esp_event_base_t base, int32_t event_id,
 }
 #endif
 
+esp_err_t mqtt_transport_provision_password(const char *password)
+{
+    if (password == NULL || strlen(password) == 0U ||
+        strlen(password) > MQTT_PASSWORD_MAX) {
+        return ESP_ERR_INVALID_ARG;
+    }
+#if CONFIG_AIOT_MQTT_ENABLED
+    nvs_handle_t handle = 0;
+    ESP_RETURN_ON_ERROR(nvs_open(MQTT_CREDENTIAL_NAMESPACE, NVS_READWRITE, &handle),
+                        TAG, "open MQTT credential namespace");
+    esp_err_t err = nvs_set_str(handle, MQTT_PASSWORD_KEY, password);
+    if (err == ESP_OK) err = nvs_commit(handle);
+    nvs_close(handle);
+    if (err == ESP_OK) ESP_LOGI(TAG, "MQTT password stored; restart to apply");
+    return err;
+#else
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
 esp_err_t mqtt_transport_init(void)
 {
     ESP_RETURN_ON_ERROR(make_topic(s_telemetry_topic, sizeof(s_telemetry_topic), "telemetry"),
@@ -91,11 +123,30 @@ esp_err_t mqtt_transport_init(void)
         ESP_LOGE(TAG, "production MQTT requires mqtts:// with hostname verification");
         return ESP_ERR_INVALID_ARG;
     }
+    nvs_handle_t credential_handle = 0;
+    if (nvs_open(MQTT_CREDENTIAL_NAMESPACE, NVS_READONLY, &credential_handle) == ESP_OK) {
+        size_t password_size = sizeof(s_password);
+        if (nvs_get_str(credential_handle, MQTT_PASSWORD_KEY, s_password,
+                        &password_size) != ESP_OK) {
+            memset(s_password, 0, sizeof(s_password));
+        }
+        nvs_close(credential_handle);
+    }
+#if CONFIG_AIOT_COMMANDS_ENABLED
+    s_commands_authenticated = aiot_mqtt_commands_authorized(
+        tls, CONFIG_AIOT_MQTT_USERNAME, s_password);
+    if (!s_commands_authenticated) {
+        ESP_LOGW(TAG, "command dispatch disabled: verified TLS, username, and runtime password are required");
+    }
+#else
+    s_commands_authenticated = false;
+#endif
     const esp_mqtt_client_config_t config = {
         .broker.address.uri = CONFIG_AIOT_MQTT_BROKER_URI,
         .broker.verification.crt_bundle_attach = tls ? esp_crt_bundle_attach : NULL,
         .credentials.client_id = CONFIG_AIOT_DEVICE_ID,
         .credentials.username = CONFIG_AIOT_MQTT_USERNAME[0] != '\0' ? CONFIG_AIOT_MQTT_USERNAME : NULL,
+        .credentials.authentication.password = s_password[0] != '\0' ? s_password : NULL,
         .network.reconnect_timeout_ms = MQTT_RECONNECT_TIMEOUT_MS,
         .buffer.size = MQTT_PAYLOAD_MAX,
     };

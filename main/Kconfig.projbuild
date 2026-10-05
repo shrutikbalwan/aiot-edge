@@ -14,8 +14,24 @@ config AIOT_BLE_ENABLED
     depends on BT_NIMBLE_ENABLED
     default n
 
+config AIOT_WIFI_ENABLED
+    bool "Enable Wi-Fi station from runtime-provisioned NVS credentials"
+    default n
+
+config AIOT_WIFI_MAX_RECONNECT_MS
+    int "Maximum Wi-Fi reconnect backoff in milliseconds"
+    range 1000 60000
+    default 30000
+    depends on AIOT_WIFI_ENABLED
+
 config AIOT_MQTT_ENABLED
     bool "Enable MQTT transport"
+    depends on AIOT_WIFI_ENABLED
+    default n
+
+config AIOT_COMMANDS_ENABLED
+    bool "Enable authenticated MQTT command dispatch"
+    depends on AIOT_MQTT_ENABLED
     default n
 
 config AIOT_OTA_ENABLED

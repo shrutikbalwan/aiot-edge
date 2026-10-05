@@ -1,6 +1,7 @@
 #include "ble_transport.h"
 
 #include "aiot_serialization.h"
+#include "command_dispatcher.h"
 #include "esp_check.h"
 #include "esp_log.h"
 
@@ -72,8 +73,10 @@ static int access_callback(uint16_t connection_handle, uint16_t attribute_handle
         if (aiot_parse_command_json(payload, length, &command) != ESP_OK) {
             return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
         }
-        ESP_LOGI(TAG, "validated BLE command kind=%d", command.kind);
-        return 0;
+        /* Encryption alone is not product authorization. Reject until a
+         * provisioned BLE identity/ACL is implemented. */
+        return command_dispatcher_submit(&command, AIOT_COMMAND_SOURCE_BLE, false) == ESP_OK
+                   ? 0 : BLE_ATT_ERR_INSUFFICIENT_AUTHEN;
     }
     return BLE_ATT_ERR_READ_NOT_PERMITTED;
 }
