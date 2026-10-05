@@ -1,0 +1,9 @@
+{
+  "name": "aiot-edge-dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node --check www/app.js && node --check tests/dashboard.test.mjs",
+    "test": "node tests/dashboard.test.mjs"
+  }
+}

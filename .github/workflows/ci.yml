@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements-ml.txt
+      - run: python -m compileall ml tests scripts
+      - run: python -m pytest
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      - run: python -m ml.pipeline --synthetic-demo --epochs 1 --embed-c
+      - run: npm run lint
+      - run: npm test
+      - run: python scripts/secret_scan.py
+      - run: python scripts/check_docs.py
+
+  esp-idf:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.1.6
+    steps:
+      - uses: actions/checkout@v4
+      - run: idf.py set-target esp32s3
+      - run: idf.py fullclean
+      - run: idf.py build
+      - run: idf.py -B build-features -D SDKCONFIG=sdkconfig.features -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;config/examples/sdkconfig.features.defaults' build
